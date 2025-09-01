@@ -1,4 +1,4 @@
-package io.github.lsposed.disableflagsecure;
+package org.matrix.disableflagsecure;
 
 import android.app.Activity;
 import android.graphics.Paint;

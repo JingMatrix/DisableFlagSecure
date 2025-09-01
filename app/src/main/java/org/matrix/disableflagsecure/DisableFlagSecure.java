@@ -1,4 +1,4 @@
-package io.github.lsposed.disableflagsecure;
+package org.matrix.disableflagsecure;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;

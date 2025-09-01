@@ -7,11 +7,11 @@ android {
     buildToolsVersion "36.0.0"
 
     defaultConfig {
-        applicationId "io.github.lsposed.disableflagsecure"
+        applicationId "org.matrix.disableflagsecure"
         minSdkVersion 31
         targetSdkVersion 36
         versionCode rootProject.ext.commitCount
-        versionName "Swan Song"
+        versionName "Phoenix Flight"
     }
 
     Properties localProperties = new Properties()
@@ -58,7 +58,7 @@ android {
     }
 
     dependenciesInfo.includeInApk false
-    namespace 'io.github.lsposed.disableflagsecure'
+    namespace 'org.matrix.disableflagsecure'
 }
 
 dependencies {
