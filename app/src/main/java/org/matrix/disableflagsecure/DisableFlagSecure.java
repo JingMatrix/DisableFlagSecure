@@ -228,19 +228,38 @@ public class DisableFlagSecure extends XposedModule {
         hook(isSecureLockedMethod, SecureLockedHooker.class);
     }
 
-    private static Field captureSecureLayersField;
+    private static Field captureSecureLayersField;      // For Android < 16
+    private static Field secureContentPolicyField;      // For Android 16+
+    private static Field protectedContentPolicyField;   // For Android 16+
 
     private void hookScreenCapture(ClassLoader classLoader) throws ClassNotFoundException, NoSuchFieldException {
-        var screenCaptureClazz = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ?
-                classLoader.loadClass("android.window.ScreenCapture") :
-                SurfaceControl.class;
-        var captureArgsClazz = classLoader.loadClass(Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ?
-                "android.window.ScreenCapture$CaptureArgs" :
-                "android.view.SurfaceControl$CaptureArgs");
-        captureSecureLayersField = captureArgsClazz.getDeclaredField("mCaptureSecureLayers");
-        captureSecureLayersField.setAccessible(true);
-        hookMethods(screenCaptureClazz, ScreenCaptureHooker.class, "nativeCaptureDisplay");
-        hookMethods(screenCaptureClazz, ScreenCaptureHooker.class, "nativeCaptureLayers");
+        Class<?> screenCaptureClazz;
+        String captureArgsClassName;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+            captureArgsClassName = "android.window.ScreenCaptureInternal$CaptureArgs";
+            screenCaptureClazz = classLoader.loadClass("android.window.ScreenCaptureInternal");
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            captureArgsClassName = "android.window.ScreenCapture$CaptureArgs";
+            screenCaptureClazz = classLoader.loadClass("android.window.ScreenCapture");
+        } else {
+            captureArgsClassName = "android.view.SurfaceControl$CaptureArgs";
+            screenCaptureClazz = SurfaceControl.class;
+        }
+        var captureArgsClazz = classLoader.loadClass(captureArgsClassName);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+            secureContentPolicyField = captureArgsClazz.getDeclaredField("mSecureContentPolicy");
+            secureContentPolicyField.setAccessible(true);
+            protectedContentPolicyField = captureArgsClazz.getDeclaredField("mProtectedContentPolicy");
+            protectedContentPolicyField.setAccessible(true);
+            hookMethods(screenCaptureClazz, ScreenCaptureHooker.class, "captureDisplay");
+            hookMethods(screenCaptureClazz, ScreenCaptureHooker.class, "captureLayers");
+        } else {
+            captureSecureLayersField = captureArgsClazz.getDeclaredField("mCaptureSecureLayers");
+            captureSecureLayersField.setAccessible(true);
+            hookMethods(screenCaptureClazz, ScreenCaptureHooker.class, "nativeCaptureDisplay");
+            hookMethods(screenCaptureClazz, ScreenCaptureHooker.class, "nativeCaptureLayers");
+        }
     }
 
     private void hookDisplayControl(ClassLoader classLoader) throws ClassNotFoundException, NoSuchMethodException {
@@ -373,7 +392,15 @@ public class DisableFlagSecure extends XposedModule {
         public static void before(@NonNull BeforeHookCallback callback) {
             var captureArgs = callback.getArgs()[0];
             try {
-                captureSecureLayersField.set(captureArgs, true);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                    module.log("captureArgs: [secureContentPolicy, protectedContentPolicy]: ["
+                            + secureContentPolicyField.get(captureArgs) + ", "
+                            + protectedContentPolicyField.get(captureArgs) + "]");
+                    secureContentPolicyField.set(captureArgs, 1);
+                    protectedContentPolicyField.set(captureArgs, 1);
+                } else {
+                    captureSecureLayersField.set(captureArgs, true);
+                }
             } catch (IllegalAccessException t) {
                 module.log("ScreenCaptureHooker failed", t);
             }
