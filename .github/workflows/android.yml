@@ -2,6 +2,7 @@ name: Android CI
 
 on:
   push:
+    branches: [ main ]
   pull_request:
   workflow_dispatch:
 
@@ -52,7 +53,6 @@ jobs:
         # build dependencies
         cd libxposed/api && ./gradlew publishToMavenLocal && cd ../..
         # build DisableFlagSecure
-        chmod +x gradlew
         ./gradlew assembleRelease assembleDebug
 
     - name: Upload artifact
