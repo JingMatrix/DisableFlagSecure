@@ -10,15 +10,15 @@ import android.view.SurfaceControl;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 
-import java.lang.reflect.Field;
-import java.util.Arrays;
-import java.util.function.BiConsumer;
-import java.util.function.BiPredicate;
-
 import io.github.libxposed.api.XposedInterface;
 import io.github.libxposed.api.XposedModule;
 import io.github.libxposed.api.annotations.BeforeInvocation;
 import io.github.libxposed.api.annotations.XposedHooker;
+
+import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
 
 @SuppressLint({"PrivateApi", "BlockedPrivateApi"})
 public class DisableFlagSecure extends XposedModule {
@@ -169,8 +169,9 @@ public class DisableFlagSecure extends XposedModule {
                 }
             case SYSTEMUI:
             case MIUI_SCREENSHOT:
-                if (OPLUS_APPPLATFORM.equals(pn) || OPLUS_SCREENSHOT.equals(pn) ||
-                        Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                if (OPLUS_APPPLATFORM.equals(pn)
+                        || OPLUS_SCREENSHOT.equals(pn)
+                        || Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     // ScreenCapture in App (S~T) (OPlus S~V)
                     // TODO: test Oplus Baklava
                     try {
@@ -199,7 +200,8 @@ public class DisableFlagSecure extends XposedModule {
 
         for (int i = 0; i < 20; i++) {
             try {
-                var clazz = classLoader.loadClass("com.android.server.wm.RootWindowContainer$$ExternalSyntheticLambda" + i);
+                var clazz = classLoader.loadClass(
+                        "com.android.server.wm.RootWindowContainer$$ExternalSyntheticLambda" + i);
                 if (BiConsumer.class.isAssignableFrom(clazz)) {
                     deoptimizeMethods(clazz, "accept");
                 }
@@ -222,17 +224,19 @@ public class DisableFlagSecure extends XposedModule {
                 .forEach(this::deoptimize);
     }
 
-    private void hookWindowState(ClassLoader classLoader) throws ClassNotFoundException, NoSuchMethodException {
+    private void hookWindowState(ClassLoader classLoader)
+            throws ClassNotFoundException, NoSuchMethodException {
         var windowStateClazz = classLoader.loadClass("com.android.server.wm.WindowState");
         var isSecureLockedMethod = windowStateClazz.getDeclaredMethod("isSecureLocked");
         hook(isSecureLockedMethod, SecureLockedHooker.class);
     }
 
-    private static Field captureSecureLayersField;      // For Android < 16
-    private static Field secureContentPolicyField;      // For Android 16+
-    private static Field protectedContentPolicyField;   // For Android 16+
+    private static Field captureSecureLayersField; // For Android < 16
+    private static Field secureContentPolicyField; // For Android 16+
+    private static Field protectedContentPolicyField; // For Android 16+
 
-    private void hookScreenCapture(ClassLoader classLoader) throws ClassNotFoundException, NoSuchFieldException {
+    private void hookScreenCapture(ClassLoader classLoader)
+            throws ClassNotFoundException, NoSuchFieldException {
         Class<?> screenCaptureClazz;
         String captureArgsClassName;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
@@ -250,7 +254,8 @@ public class DisableFlagSecure extends XposedModule {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
             secureContentPolicyField = captureArgsClazz.getDeclaredField("mSecureContentPolicy");
             secureContentPolicyField.setAccessible(true);
-            protectedContentPolicyField = captureArgsClazz.getDeclaredField("mProtectedContentPolicy");
+            protectedContentPolicyField =
+                    captureArgsClazz.getDeclaredField("mProtectedContentPolicy");
             protectedContentPolicyField.setAccessible(true);
             hookMethods(screenCaptureClazz, ScreenCaptureHooker.class, "captureDisplay");
             hookMethods(screenCaptureClazz, ScreenCaptureHooker.class, "captureLayers");
@@ -262,75 +267,100 @@ public class DisableFlagSecure extends XposedModule {
         }
     }
 
-    private void hookDisplayControl(ClassLoader classLoader) throws ClassNotFoundException, NoSuchMethodException {
-        var displayControlClazz = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ?
-                classLoader.loadClass("com.android.server.display.DisplayControl") :
-                SurfaceControl.class;
+    private void hookDisplayControl(ClassLoader classLoader)
+            throws ClassNotFoundException, NoSuchMethodException {
+        var displayControlClazz = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+                ? classLoader.loadClass("com.android.server.display.DisplayControl")
+                : SurfaceControl.class;
         var method = displayControlClazz.getDeclaredMethod(
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM ?
-                        "createVirtualDisplay" :
-                        "createDisplay", String.class, boolean.class);
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM
+                        ? "createVirtualDisplay"
+                        : "createDisplay",
+                String.class,
+                boolean.class);
         hook(method, CreateDisplayHooker.class);
     }
 
     private void hookVirtualDisplayAdapter(ClassLoader classLoader) throws ClassNotFoundException {
-        var displayControlClazz = classLoader.loadClass("com.android.server.display.VirtualDisplayAdapter");
-        hookMethods(displayControlClazz, CreateVirtualDisplayLockedHooker.class, "createVirtualDisplayLocked");
+        var displayControlClazz =
+                classLoader.loadClass("com.android.server.display.VirtualDisplayAdapter");
+        hookMethods(
+                displayControlClazz,
+                CreateVirtualDisplayLockedHooker.class,
+                "createVirtualDisplayLocked");
     }
 
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-    private void hookActivityTaskManagerService(ClassLoader classLoader) throws ClassNotFoundException, NoSuchMethodException {
-        var activityTaskManagerServiceClazz = classLoader.loadClass("com.android.server.wm.ActivityTaskManagerService");
+    private void hookActivityTaskManagerService(ClassLoader classLoader)
+            throws ClassNotFoundException, NoSuchMethodException {
+        var activityTaskManagerServiceClazz =
+                classLoader.loadClass("com.android.server.wm.ActivityTaskManagerService");
         var iBinderClazz = classLoader.loadClass("android.os.IBinder");
-        var iScreenCaptureObserverClazz = classLoader.loadClass("android.app.IScreenCaptureObserver");
-        var method = activityTaskManagerServiceClazz.getDeclaredMethod("registerScreenCaptureObserver", iBinderClazz, iScreenCaptureObserverClazz);
+        var iScreenCaptureObserverClazz =
+                classLoader.loadClass("android.app.IScreenCaptureObserver");
+        var method = activityTaskManagerServiceClazz.getDeclaredMethod(
+                "registerScreenCaptureObserver", iBinderClazz, iScreenCaptureObserverClazz);
         hook(method, ReturnNullHooker.class);
     }
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
-    private void hookWindowManagerService(ClassLoader classLoader) throws ClassNotFoundException, NoSuchMethodException {
-        var windowManagerServiceClazz = classLoader.loadClass("com.android.server.wm.WindowManagerService");
-        var iScreenRecordingCallbackClazz = classLoader.loadClass("android.window.IScreenRecordingCallback");
-        var method = windowManagerServiceClazz.getDeclaredMethod("registerScreenRecordingCallback", iScreenRecordingCallbackClazz);
+    private void hookWindowManagerService(ClassLoader classLoader)
+            throws ClassNotFoundException, NoSuchMethodException {
+        var windowManagerServiceClazz =
+                classLoader.loadClass("com.android.server.wm.WindowManagerService");
+        var iScreenRecordingCallbackClazz =
+                classLoader.loadClass("android.window.IScreenRecordingCallback");
+        var method = windowManagerServiceClazz.getDeclaredMethod(
+                "registerScreenRecordingCallback", iScreenRecordingCallbackClazz);
         hook(method, ReturnFalseHooker.class);
     }
 
-    private void hookActivityManagerService(ClassLoader classLoader) throws ClassNotFoundException, NoSuchMethodException {
-        var activityTaskManagerServiceClazz = classLoader.loadClass("com.android.server.am.ActivityManagerService");
-        var method = activityTaskManagerServiceClazz.getDeclaredMethod("checkPermission", String.class, int.class, int.class);
+    private void hookActivityManagerService(ClassLoader classLoader)
+            throws ClassNotFoundException, NoSuchMethodException {
+        var activityTaskManagerServiceClazz =
+                classLoader.loadClass("com.android.server.am.ActivityManagerService");
+        var method = activityTaskManagerServiceClazz.getDeclaredMethod(
+                "checkPermission", String.class, int.class, int.class);
         hook(method, CheckPermissionHooker.class);
     }
 
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     private void hookHyperOS(ClassLoader classLoader) throws ClassNotFoundException {
-        var windowManagerServiceImplClazz = classLoader.loadClass("com.android.server.wm.WindowManagerServiceImpl");
-        hookMethods(windowManagerServiceImplClazz, ReturnFalseHooker.class, "notAllowCaptureDisplay");
+        var windowManagerServiceImplClazz =
+                classLoader.loadClass("com.android.server.wm.WindowManagerServiceImpl");
+        hookMethods(
+                windowManagerServiceImplClazz, ReturnFalseHooker.class, "notAllowCaptureDisplay");
     }
 
-    private void hookScreenshotHardwareBuffer(ClassLoader classLoader) throws ClassNotFoundException, NoSuchMethodException {
+    private void hookScreenshotHardwareBuffer(ClassLoader classLoader)
+            throws ClassNotFoundException, NoSuchMethodException {
         var screenshotHardwareBufferClazz = classLoader.loadClass(
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ?
-                        "android.window.ScreenCapture$ScreenshotHardwareBuffer" :
-                        "android.view.SurfaceControl$ScreenshotHardwareBuffer");
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+                        ? "android.window.ScreenCapture$ScreenshotHardwareBuffer"
+                        : "android.view.SurfaceControl$ScreenshotHardwareBuffer");
         var method = screenshotHardwareBufferClazz.getDeclaredMethod("containsSecureLayers");
         hook(method, ReturnFalseHooker.class);
     }
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
-    private void hookOplusScreenCapture(ClassLoader classLoader) throws ClassNotFoundException, NoSuchMethodException {
-        var oplusScreenCaptureClazz = classLoader.loadClass("com.oplus.screenshot.OplusScreenCapture$CaptureArgs$Builder");
+    private void hookOplusScreenCapture(ClassLoader classLoader)
+            throws ClassNotFoundException, NoSuchMethodException {
+        var oplusScreenCaptureClazz = classLoader.loadClass(
+                "com.oplus.screenshot.OplusScreenCapture$CaptureArgs$Builder");
         var method = oplusScreenCaptureClazz.getDeclaredMethod("setUid", long.class);
         hook(method, OplusScreenCaptureHooker.class);
     }
 
     private void hookOplus(ClassLoader classLoader) throws ClassNotFoundException {
         // caller: com.android.server.wm.OplusLongshotWindowDump#dumpWindows
-        var longshotMainClazz = classLoader.loadClass("com.android.server.wm.OplusLongshotMainWindow");
+        var longshotMainClazz =
+                classLoader.loadClass("com.android.server.wm.OplusLongshotMainWindow");
         hookMethods(longshotMainClazz, ReturnFalseHooker.class, "hasSecure");
     }
 
     private void hookOneUI(ClassLoader classLoader) throws ClassNotFoundException {
-        var wmScreenshotControllerClazz = classLoader.loadClass("com.android.server.wm.WmScreenshotController");
+        var wmScreenshotControllerClazz =
+                classLoader.loadClass("com.android.server.wm.WmScreenshotController");
         hookMethods(wmScreenshotControllerClazz, ReturnTrueHooker.class, "canBeScreenshotTarget");
     }
 
@@ -437,18 +467,18 @@ public class DisableFlagSecure extends XposedModule {
         public static void before(@NonNull BeforeHookCallback callback) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 var walker = StackWalker.getInstance();
-                var match = walker.walk(frames -> frames
-                        .map(StackWalker.StackFrame::getMethodName)
+                var match = walker.walk(frames -> frames.map(StackWalker.StackFrame::getMethodName)
                         .limit(6)
                         .skip(2)
-                        .anyMatch(s -> s.equals("setInitialSurfaceControlProperties") || s.equals("createSurfaceLocked")));
+                        .anyMatch(s -> s.equals("setInitialSurfaceControlProperties")
+                                || s.equals("createSurfaceLocked")));
                 if (match) return;
             } else {
                 var stackTrace = new Throwable().getStackTrace();
                 for (int i = 4; i < stackTrace.length && i < 8; i++) {
                     var name = stackTrace[i].getMethodName();
-                    if (name.equals("setInitialSurfaceControlProperties") ||
-                            name.equals("createSurfaceLocked")) {
+                    if (name.equals("setInitialSurfaceControlProperties")
+                            || name.equals("createSurfaceLocked")) {
                         return;
                     }
                 }
